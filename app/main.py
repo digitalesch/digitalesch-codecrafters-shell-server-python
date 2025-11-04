@@ -12,6 +12,8 @@ class Shell():
             "pwd":  self.pwd
         }
 
+        self.current_dir = os.getcwd()
+
         # Get the PATH environment variable
         self.path_var = os.environ.get("PATH", "")
 
@@ -69,7 +71,17 @@ class Shell():
         return None
     
     def pwd(self, *args, **kwargs):
-        print(os.getcwd())
+        # print(os.getcwd())
+        print(self.current_dir)
+        return 0
+    
+    def cd(self, *args, **kwargs):
+        if os.path.exists(args[0]):
+            self.current_dir = args[0]
+        else:
+            print(f"cd: {args[0]}: No such file or directory")
+            # cd: /does_not_exist: No such file or directory
+        
         return 0
 
 def main():
