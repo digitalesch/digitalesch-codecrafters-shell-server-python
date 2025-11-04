@@ -1,6 +1,7 @@
 from typing import List
 import sys
 import os
+import subprocess
 
 class Shell():
     def __init__(self):
@@ -17,41 +18,33 @@ class Shell():
         self.paths = self.path_var.split(os.pathsep)  # os.pathsep is ':' on Linux/Mac, ';' on Windows
 
     def parse_commands(self, input: str, **kwargs):
-        parts = input.split(" ")
+        parts = input.strip().split(" ")
         
         return {
+            "original": parts,
             "command": parts[0],
             "args": parts[1:]
         }
 
-    def execute_command(self, inputs: List[str]):
-        command = self.parse_commands(inputs)
+    def execute_command(self, args: str):
+        command = self.parse_commands(args)
         try:
             return self.available_commands[command.get("command")](*command.get("args"))
         except Exception as e:
-            sys.stdout.write(f"{command.get("command")}: command not found\n")
-            return 1
+            custom_program_return = self.execute_program(*command.get("original"))
+            if custom_program_return:
+                return custom_program_return.returncode
+            if not custom_program_return:
+                sys.stdout.write(f"{command.get("command")}: command not found\n")
+                return 1
 
     def exit(self, *args, **kwargs):
-        # if len(args) == 1:
-        #     try:
-        #         value = int(args[0])
-        #     except:
-        #         return -1
         return -1
 
     def echo(self, *args, **kwargs):
         print(' '.join(args))
         return 0
 
-
-    """
-    file_path = "/usr/bin/python3"
-
-        print(f"{file_path} is executable")
-    else:
-        print(f"{file_path} is NOT executable")
-    """
     def type(self, *args, **kwargs):
         
         if args[0] in self.available_commands:
@@ -65,6 +58,14 @@ class Shell():
 
             print(f"{args[0]}: not found")
         return 0
+    
+    def execute_program(self, *args, **kwargs):
+        for path in self.paths:
+            # print(args)
+            file_path = os.path.join(path,args[0])
+            if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
+                return subprocess.run(args)
+        return None
 
 def main():
     # TODO: Uncomment the code below to pass the first stage
