@@ -31,18 +31,3 @@ def exit(*args, **kwargs):
         except:
             return -1
     return 1
-
-def main():
-    # TODO: Uncomment the code below to pass the first stage
-    while True:
-        sys.stdout.write("$ ")
-        return_code = execute_command(input())
-        # if not return_code:
-        #     pass
-            # sys.stdout.write(f"{command.get("command")}: command not found\n")
-        if return_code >= 0:
-            break
-        # print(return_code)
-
-if __name__ == "__main__":
-    main()
