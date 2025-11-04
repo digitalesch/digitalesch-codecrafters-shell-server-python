@@ -19,10 +19,9 @@ def execute_command(inputs: List[str]):
         return available_commands[command.get("command")](*command.get("args"))
     except Exception as e:
         sys.stdout.write(f"{command.get("command")}: command not found\n")
-        return -1
+        return 1
 
 def exit(*args, **kwargs):
-    value = 0
     # if len(args) == 1:
     #     try:
     #         value = int(args[0])
