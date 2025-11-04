@@ -15,11 +15,9 @@ def execute_command(inputs: List[str]):
         'echo': echo
     }
     command = parse_commands(inputs)
-    # print(f"CMD is: {command}")
     try:
         return available_commands[command.get("command")](*command.get("args"))
     except Exception as e:
-        # print(e)
         sys.stdout.write(f"{command.get("command")}: command not found\n")
         return -1
 
@@ -29,8 +27,8 @@ def exit(*args, **kwargs):
         try:
             value = int(args[0])
         except:
-            return -1
-    return 1
+            return 1
+    return value
 
 def echo(*args, **kwargs):
     print(' '.join(args) + '\n')
