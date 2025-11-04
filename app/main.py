@@ -77,6 +77,9 @@ class Shell():
         return 0
     
     def cd(self, *args, **kwargs):
+        if args[0] == "~":
+            self.current_dir = os.getenv("HOME")
+            return 0
         if os.path.isabs(args[0]):
             if os.path.exists(args[0]):
                 self.current_dir = args[0]
