@@ -41,7 +41,7 @@ class Shell():
         if args[0] in self.available_commands:
             print(f"{args[0]} is a shell builtin")
         else:
-            print(f"{args[0]}: not found\n")
+            print(f"{args[0]}: not found")
         return 0
 
 def main():
