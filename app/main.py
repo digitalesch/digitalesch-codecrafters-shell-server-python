@@ -1,5 +1,6 @@
 from typing import List
 import sys
+import os
 
 class Shell():
     def __init__(self):
@@ -8,6 +9,12 @@ class Shell():
             'echo': self.echo,
             'type': self.type
         }
+
+        # Get the PATH environment variable
+        self.path_var = os.environ.get("PATH", "")
+
+        # Split it into individual directories
+        self.paths = self.path_var.split(os.pathsep)  # os.pathsep is ':' on Linux/Mac, ';' on Windows
 
     def parse_commands(self, input: str, **kwargs):
         parts = input.split(" ")
@@ -37,10 +44,25 @@ class Shell():
         print(' '.join(args))
         return 0
 
+
+    """
+    file_path = "/usr/bin/python3"
+
+        print(f"{file_path} is executable")
+    else:
+        print(f"{file_path} is NOT executable")
+    """
     def type(self, *args, **kwargs):
+        
         if args[0] in self.available_commands:
             print(f"{args[0]} is a shell builtin")
         else:
+            for path in self.paths:
+                file_path = os.path.join(path,args[0])
+                if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
+                    print(f"{args[0]} is {file_path}")
+                    return 0
+
             print(f"{args[0]}: not found")
         return 0
 
