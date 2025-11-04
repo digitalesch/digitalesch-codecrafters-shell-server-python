@@ -11,7 +11,8 @@ def parse_commands(input: str, **kwargs):
 
 def execute_command(inputs: List[str]):
     available_commands = {
-        'exit': exit
+        'exit': exit,
+        'echo': echo
     }
     command = parse_commands(inputs)
     # print(f"CMD is: {command}")
@@ -21,7 +22,6 @@ def execute_command(inputs: List[str]):
         # print(e)
         sys.stdout.write(f"{command.get("command")}: command not found\n")
         return -1
-    
 
 def exit(*args, **kwargs):
     value = 0
@@ -31,6 +31,10 @@ def exit(*args, **kwargs):
         except:
             return -1
     return 1
+
+def echo(*args, **kwargs):
+    print(' '.join(args) + '\n')
+    return 0
 
 def main():
     # TODO: Uncomment the code below to pass the first stage
