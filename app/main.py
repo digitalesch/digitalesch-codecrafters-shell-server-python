@@ -9,7 +9,8 @@ class Shell():
             'exit': self.exit,
             'echo': self.echo,
             'type': self.type,
-            "pwd":  self.pwd
+            "pwd":  self.pwd,
+            "cd":   self.cd
         }
 
         self.current_dir = os.getcwd()
