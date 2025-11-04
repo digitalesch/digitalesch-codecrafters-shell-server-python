@@ -8,7 +8,8 @@ class Shell():
         self.available_commands = {
             'exit': self.exit,
             'echo': self.echo,
-            'type': self.type
+            'type': self.type,
+            "pwd":  self.pwd
         }
 
         # Get the PATH environment variable
@@ -23,7 +24,7 @@ class Shell():
         return {
             "original": parts,
             "command": parts[0],
-            "args": parts[1:]
+            "args": parts[1:],
         }
 
     def execute_command(self, args: str):
@@ -66,6 +67,10 @@ class Shell():
             if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                 return subprocess.run(args)
         return None
+    
+    def pwd(self, *args, **kwargs):
+        print(os.getcwd())
+        return 0
 
 def main():
     # TODO: Uncomment the code below to pass the first stage
