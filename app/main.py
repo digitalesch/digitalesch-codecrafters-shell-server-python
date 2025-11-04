@@ -23,12 +23,12 @@ def execute_command(inputs: List[str]):
 
 def exit(*args, **kwargs):
     value = 0
-    if len(args) == 1:
-        try:
-            value = int(args[0])
-        except:
-            return 1
-    return value
+    # if len(args) == 1:
+    #     try:
+    #         value = int(args[0])
+    #     except:
+    #         return -1
+    return -1
 
 def echo(*args, **kwargs):
     print(' '.join(args))
@@ -39,12 +39,8 @@ def main():
     while True:
         sys.stdout.write("$ ")
         return_code = execute_command(input())
-        # if not return_code:
-        #     pass
-            # sys.stdout.write(f"{command.get("command")}: command not found\n")
-        if return_code > 0:
+        if return_code < 0:
             break
-        # print(return_code)
 
 if __name__ == "__main__":
     main()
