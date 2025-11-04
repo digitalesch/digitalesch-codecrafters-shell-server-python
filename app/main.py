@@ -31,7 +31,7 @@ def exit(*args, **kwargs):
     return value
 
 def echo(*args, **kwargs):
-    print(' '.join(args) + '\n')
+    print(' '.join(args))
     return 0
 
 def main():
@@ -42,7 +42,7 @@ def main():
         # if not return_code:
         #     pass
             # sys.stdout.write(f"{command.get("command")}: command not found\n")
-        if return_code >= 0:
+        if return_code > 0:
             break
         # print(return_code)
 
