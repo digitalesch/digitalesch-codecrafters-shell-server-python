@@ -77,10 +77,18 @@ class Shell():
         return 0
     
     def cd(self, *args, **kwargs):
-        if os.path.exists(args[0]):
-            self.current_dir = args[0]
+        if os.path.isabs(args[0]):
+            if os.path.exists(args[0]):
+                self.current_dir = args[0]
+            else:
+                print(f"cd: {args[0]}: No such file or directory")
         else:
-            print(f"cd: {args[0]}: No such file or directory")
+            joined_path = os.path.normpath(os.path.join(self.current_dir, args[0]))
+            if os.path.exists(joined_path):
+                self.current_dir = joined_path
+            else:
+                print(f"cd: {joined_path}: No such file or directory")
+        # else:
             # cd: /does_not_exist: No such file or directory
         
         return 0
