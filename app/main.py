@@ -48,8 +48,11 @@ class Shell():
 
     def echo(self, *args, **kwargs):
         joined_string = ' '.join(args)
+        # quoted string, not to be modified
         if quoted_string_match := re.match(r"^[\"'](.*)[\"']$",joined_string):
             joined_string = quoted_string_match.group(1)
+        else:
+            joined_string = re.sub(r"\s+"," ",joined_string)
         print(joined_string)
         return 0
 
