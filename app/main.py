@@ -2,6 +2,7 @@ from typing import List
 import sys
 import os
 import subprocess
+import re
 
 class Shell():
     def __init__(self):
@@ -47,8 +48,8 @@ class Shell():
 
     def echo(self, *args, **kwargs):
         joined_string = ' '.join(args)
-        if (joined_string.startswith('"') and joined_string.endswith('"')):
-            joined_string = joined_string[1:-1]
+        if quoted_string_match := re.match(r"^[\"'](.*)[\"']$",joined_string):
+            joined_string = quoted_string_match.group(1)
         print(joined_string)
         return 0
 
