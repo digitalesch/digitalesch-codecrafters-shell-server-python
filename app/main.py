@@ -3,6 +3,7 @@ import sys
 import os
 import subprocess
 import re
+import shlex
 
 class Shell():
     def __init__(self):
@@ -47,12 +48,13 @@ class Shell():
         return -1
 
     def echo(self, *args, **kwargs):
-        joined_string = ' '.join(args)
-        # quoted string, not to be modified
-        if quoted_string_match := re.match(r"^[\"'](.*)[\"']$",joined_string):
-            joined_string = quoted_string_match.group(1)
-        else:
-            joined_string = re.sub(r"\s+"," ",joined_string)
+        joined_string = ' '.join(shlex.split(' '.join(args)))
+        # joined_string = ' '.join(args)
+        # # quoted string, not to be modified
+        # if quoted_string_match := re.match(r"^[\"'](.*)[\"']$",joined_string):
+        #     joined_string = quoted_string_match.group(1)
+        # else:
+        #     joined_string = re.sub(r"\s+"," ",joined_string)
         print(joined_string)
         return 0
 
