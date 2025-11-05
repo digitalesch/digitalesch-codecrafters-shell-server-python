@@ -24,7 +24,8 @@ class Shell():
         self.paths = self.path_var.split(os.pathsep)  # os.pathsep is ':' on Linux/Mac, ';' on Windows
 
     def parse_commands(self, input: str, **kwargs):
-        parts = input.strip().split(" ")
+        # parts = input.strip().split(" ")
+        parts = shlex.split(input)
         
         return {
             "original": parts,
