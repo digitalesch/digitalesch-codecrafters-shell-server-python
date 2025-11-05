@@ -46,7 +46,10 @@ class Shell():
         return -1
 
     def echo(self, *args, **kwargs):
-        print(' '.join(args))
+        joined_string = ' '.join(args)
+        if (joined_string.startswith('"') and joined_string.endswith('"')):
+            joined_string = joined_string[1:-1]
+        print(joined_string)
         return 0
 
     def type(self, *args, **kwargs):
