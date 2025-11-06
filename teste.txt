@@ -1,0 +1,12 @@
+README.md
+a.txt
+app
+codecrafters.yml
+pyproject.toml
+shell
+teste
+teste.txt
+text.txt
+uv.lock
+venv
+your_program.sh
