@@ -32,6 +32,8 @@ def return_parsed_commands():
         ("ls -1 helloEmily.md >> bar.md",(0,"", "")),
         ("echo 'Hello James' 1>> foo.md",(0, "", "" )),
         ("echo 'Hello James' 1>> foo.md",(0, "", "" )),
+        ("cat james.md 2>> quz.md",(1, "", "")),
+        ("cat james2.md 2>> quz.md",(1, "", "")),
     ]
 )
 def test_execute_commands(command, expected):

@@ -32,11 +32,11 @@ class Shell():
             command = parts[0]
             if any(['>' in parts,'1>' in parts,'>>' in parts,'1>>' in parts]):
                 redirect = 1
-            if '2>' in parts:
+            if any(['2>' in parts,'2>>' in parts]):
                 redirect = 2
             if '2>&1' in parts:
                 redirect = 3
-            if any(['>>' in parts,'1>>' in parts]):
+            if any(['>>' in parts,'1>>' in parts, '2>>' in parts]):
                 mode = 1
             if redirect > 0:
                 file_redirect = parts[-1]
