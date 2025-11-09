@@ -78,8 +78,20 @@ class Shell():
                 # stdout_stderr = stdout | stderr
                 fp.write(redirect_output) # writes empty stdout to file
 
-        message = stdout if status_code == 0 else stderr
-                
+        # heres the error, im assuming that streams are exclusive
+        # but "cat a.txt b.txt 2> c.txt" when a exists and b not, should print stdout and redirect stderr
+        # if cmd ok -> stdout
+        # if cmd err -> stderr
+        # if cmd ok 1> then stdout to redirect
+        # if cmd err 1> then stderr to out and nothing to redirect
+        # if cmd ok 2> then stdout and nothing to redirect
+        # if cmd err 2> then nothing to stdout and stderr to redirect
+        message = ""
+        if stdout:
+            message += stdout
+        if stderr:
+            message += stderr
+
         if message:
             sys.stdout.write(message + ( "\n" if not message.endswith("\n") else ""))
         
