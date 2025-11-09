@@ -2,6 +2,32 @@ import sys
 import os
 import subprocess
 import shlex
+import readline
+
+# Define your shell commands
+COMMANDS = [
+    'echo', 'ls', 'cd', 'pwd', 'cat', 'grep', 'mkdir', 
+    'rm', 'cp', 'mv', 'exit', 'help', 'clear'
+]
+
+def completer(text, state):
+    """
+    Completion function called by readline.
+    - text: the text to complete
+    - state: iteration number (0, 1, 2... until we return None)
+    """
+    # Get matches for the current text
+    matches = [cmd + ' ' for cmd in COMMANDS if cmd.startswith(text)]
+    
+    # Return the match for this state, or None if no more matches
+    try:
+        return matches[state]
+    except IndexError:
+        return None
+
+# Set up readline
+readline.set_completer(completer)
+readline.parse_and_bind("tab: complete")
 
 class Shell():
     def __init__(self):
