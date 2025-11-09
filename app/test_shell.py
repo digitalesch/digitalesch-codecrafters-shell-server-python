@@ -21,8 +21,11 @@ def return_parsed_commands():
         ("cd ~", (0, None)),
         ("pwd", (0, '/home/felipe')),
         ("ls", (0, "README.md\napp\ncodecrafters.yml\npyproject.toml\nshell\ntext.txt\nuv.lock\nvenv\nyour_program.sh\n")),
-        ("", (0, None)) # no input is
-        ("cat /tmp/bear", (0, "cat: /tmp/bear: No such file or directory")) # stderr since the file doesnt exist
+        ("", (0, None)), # no input is
+        ("cat /tmp/bear", (0, "cat: /tmp/bear: No such file or directory")), # stderr since the file doesnt exist
+        ("echo 'banana' > /tmp/quz/banana", (0, "")),
+        ('ls -1 nonexistent 2> /tmp/bar/baz,md', "ls: nonexistent: No such file or directory"),
+        ("cat /tmp/bar/baz.md", (0, "ls: nonexistent: No such file or directory"))
     ]
 )
 def test_execute_commands(command, expected):

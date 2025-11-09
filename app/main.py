@@ -31,10 +31,13 @@ class Shell():
             command = parts[0]
             if any(['>' in parts,'1>' in parts]):
                 redirect = 1
+            if '2>' in parts:
+                redirect = 2
+            if '2>&1' in parts:
+                redirect = 3
+            if redirect > 0:
                 file_redirect = parts[-1]
                 func_args = parts[1:-2]
-            if ['>>'] in parts:
-                redirect = 2
         else:
             command = None
             func_args = []
@@ -49,48 +52,57 @@ class Shell():
 
     def execute_command(self, args: str):
         command = self.parse_commands(args)
-        # print(command)
-        status_code, stdout, stderr = 0, None, None
+        status_code, stdout, stderr = 0, "", ""
         if command.get("command"):
             try:
                 status_code, stdout, stderr = self.available_commands[command.get("command")](**command)
-                # return (status_code, output)
             except Exception as e:
                 # print(e)
                 status_code, stdout, stderr = self.execute_program(**command)
                 if status_code < 0:
-                    status_code, stdout, stderr = 1, None, f"{command.get("command")}: command not found"
-        if command.get("redirect") == 1:
+                    status_code, stdout, stderr = 1, "", f"{command.get("command")}: command not found"
+        
+        
+        # print(stderr, stdout, len(stderr), len(stdout))
+        if command.get("redirect") > 0:
             with open(command.get("file"),"w") as fp:
-                fp.write(stdout if stdout else "") # writes empty stdout to file
-                stdout = None
-        
+                if command.get("redirect") == 1:
+                    redirect_output = stdout if stdout else ""
+                    stdout = None
+                if command.get("redirect") == 2:
+                    redirect_output = stderr if stderr else ""
+                    stderr = None
+                if command.get("redirect") == 3:
+                    redirect_output = stdout + stderr
+                    stdout, stderr = None, None
+                # stdout_stderr = stdout | stderr
+                fp.write(redirect_output) # writes empty stdout to file
+
         message = stdout if status_code == 0 else stderr
-        
+                
         if message:
-            # print(message, len(message))
             sys.stdout.write(message + ( "\n" if not message.endswith("\n") else ""))
         
         # general return for no input
         return (status_code,stdout, stderr)
 
     def exit(self, *args, **kwargs):
-        return (-1, None, None)
+        return (-1, "", "")
 
     def echo(self, *args, **kwargs):
-        return (0,' '.join(kwargs.get("args")), None)
+        return (0,' '.join(kwargs.get("args")), "")
 
     def type(self, *args, **kwargs):
         command_args = kwargs.get("args")[0]
         if command_args in self.available_commands:
-            return (0, f"{command_args} is a shell builtin", None)
+            return (0, f"{command_args} is a shell builtin", "")
         else:
             for path in self.paths:
                 file_path = os.path.join(path,command_args)
                 if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
-                    return (0, f"{command_args} is {file_path}", None)
+                    return (0, f"{command_args} is {file_path}", "")
 
-            return (1, None, f"{command_args}: not found")
+            return (1, "", f"{command_args}: not found")
     
     def execute_program(self, *args, **kwargs):
         for path in self.paths:
@@ -99,33 +111,31 @@ class Shell():
                 result = subprocess.run([kwargs.get("command")] + kwargs.get("args"), capture_output=True, text=True)
                 # print(result)
                 return (result.returncode, result.stdout, result.stderr)
-        return (-1, None, None)
+        return (-1, "", "")
     
     def pwd(self, *args, **kwargs):
-        return (0, f"{self.current_dir}", None)
+        return (0, f"{self.current_dir}", "")
     
     def cd(self, *args, **kwargs):
         # gets path from kwargs args
         path = kwargs.get("args")[0]
         if path == "~":
             self.current_dir = os.getenv("HOME")
-            return (0, None, None)
+            return (0, "", "")
         if os.path.isabs(path):
             if os.path.exists(path):
                 self.current_dir = path
             else:
-                return (1, None, f"cd: {path}: No such file or directory")
+                return (1, "", f"cd: {path}: No such file or directory")
         else:
             joined_path = os.path.normpath(os.path.join(self.current_dir, path))
             if os.path.exists(joined_path):
                 self.current_dir = joined_path
             else:
-                return (1, None, f"cd: {joined_path}: No such file or directory")
+                return (1, "", f"cd: {joined_path}: No such file or directory")
         
-        return (0, None, None)
-    
-    def redirect_output(self, *args, **kwargs):
-        pass
+        return (0, "", "")
+
 
     def repl(self, *args, **kwargs):
         while True:
