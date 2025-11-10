@@ -4,30 +4,27 @@ import subprocess
 import shlex
 import readline
 
-# Define your shell commands
-COMMANDS = [
-    'echo', 'ls', 'cd', 'pwd', 'cat', 'grep', 'mkdir', 
-    'rm', 'cp', 'mv', 'exit', 'help', 'clear'
-]
+# # Define your shell commands
+# COMMANDS = [
+#     'echo', 'ls', 'cd', 'pwd', 'cat', 'grep', 'mkdir', 
+#     'rm', 'cp', 'mv', 'exit', 'help', 'clear'
+# ]
 
-def completer(text, state):
-    """
-    Completion function called by readline.
-    - text: the text to complete
-    - state: iteration number (0, 1, 2... until we return None)
-    """
-    # Get matches for the current text
-    matches = [cmd + ' ' for cmd in COMMANDS if cmd.startswith(text)]
+# def completer(text, state):
+#     """
+#     Completion function called by readline.
+#     - text: the text to complete
+#     - state: iteration number (0, 1, 2... until we return None)
+#     """
+#     # Get matches for the current text
+#     matches = [cmd + ' ' for cmd in COMMANDS if cmd.startswith(text)]
     
-    # Return the match for this state, or None if no more matches
-    try:
-        return matches[state]
-    except IndexError:
-        return None
+#     # Return the match for this state, or None if no more matches
+#     try:
+#         return matches[state]
+#     except IndexError:
+#         return None
 
-# Set up readline
-readline.set_completer(completer)
-readline.parse_and_bind("tab: complete")
 
 class Shell():
     def __init__(self):
@@ -45,6 +42,39 @@ class Shell():
         # Split it into individual directories
         self.paths = self.path_var.split(os.pathsep)  # os.pathsep is ':' on Linux/Mac, ';' on Windows
 
+        self.executable_commands = self.list_executables()
+        self.autocomplete_commands = [k for k in self.available_commands.keys()] + self.executable_commands
+       
+        # Set up readline
+        readline.set_completer(self.completer)
+        readline.parse_and_bind("tab: complete")
+
+    def list_executables(self):
+        binaries = []
+        for path in self.paths:
+            for root, _, files in os.walk(path):
+                for filename in files:
+                    filepath = os.path.join(root, filename)
+                    # print(filename,filepath)
+
+                    if os.access(filepath, os.X_OK) and not os.path.isdir(filepath) and filename not in self.paths:
+                        binaries.append(filename)
+        return binaries
+
+    def completer(self, text, state):
+        """
+        Completion function called by readline.
+        - text: the text to complete
+        - state: iteration number (0, 1, 2... until we return None)
+        """
+        # Get matches for the current text
+        matches = [cmd + ' ' for cmd in self.autocomplete_commands if cmd.startswith(text)]
+        
+        # Return the match for this state, or None if no more matches
+        try:
+            return matches[state]
+        except IndexError:
+            return None
 
     def parse_commands(self, input: str, **kwargs):
         parts = shlex.split(input)
@@ -173,7 +203,6 @@ class Shell():
         
         return (0, "", "")
 
-
     def repl(self, *args, **kwargs):
         while True:
             sys.stdout.write("$ ")
@@ -181,7 +210,6 @@ class Shell():
             
             if status_code < 0:
                 break
-
 
 def main():
     shell = Shell()
