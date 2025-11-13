@@ -35,3 +35,24 @@ def return_parsed_commands():
 )
 def test_execute_commands(command, expected):
     assert shell.execute_command(command) == expected
+
+def test_autocomplete_single_completion():
+
+    # Simulate typing "ech" (should autocomplete to "echo ")
+    text = "ech"
+    state = 0
+
+    completions = []
+    while True:
+        result = shell.completer(text, state)
+        if result is None:
+            break
+        completions.append(result)
+        state += 1
+
+    print("Completions:", completions)
+
+    # Check that the single match completes to 'o ' (not 'echo ')
+    assert completions == ["echo "], f"Expected ['o '], got {completions}"
+
+    print("✅ test_autocomplete_single_completion passed!")

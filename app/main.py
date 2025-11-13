@@ -4,28 +4,6 @@ import subprocess
 import shlex
 import readline
 
-# # Define your shell commands
-# COMMANDS = [
-#     'echo', 'ls', 'cd', 'pwd', 'cat', 'grep', 'mkdir', 
-#     'rm', 'cp', 'mv', 'exit', 'help', 'clear'
-# ]
-
-# def completer(text, state):
-#     """
-#     Completion function called by readline.
-#     - text: the text to complete
-#     - state: iteration number (0, 1, 2... until we return None)
-#     """
-#     # Get matches for the current text
-#     matches = [cmd + ' ' for cmd in COMMANDS if cmd.startswith(text)]
-    
-#     # Return the match for this state, or None if no more matches
-#     try:
-#         return matches[state]
-#     except IndexError:
-#         return None
-
-
 class Shell():
     def __init__(self):
         self.available_commands = {
@@ -35,30 +13,34 @@ class Shell():
             "pwd":  self.pwd,
             "cd":   self.cd
         }
-        # Gets current directory as PWD
         self.current_dir = os.getcwd()
-        # Get the PATH environment variable
         self.path_var = os.environ.get("PATH", "")
-        # Split it into individual directories
-        self.paths = self.path_var.split(os.pathsep)  # os.pathsep is ':' on Linux/Mac, ';' on Windows
+        # self.path_var = "bin/bar:bin/foo:bin/qux"
+        self.paths = self.path_var.split(os.pathsep)
 
         self.executable_commands = self.list_executables()
-        self.autocomplete_commands = [k for k in self.available_commands.keys()] + self.executable_commands
-       
+
+        # FIXED: Deduplicate and prioritize builtins
+        builtin_cmds = list(self.available_commands.keys())
+        external_cmds = [cmd for cmd in self.executable_commands if cmd not in builtin_cmds]
+        self.autocomplete_commands = builtin_cmds + external_cmds
+        self.autocomplete_commands.sort()  # Optional: consistent order
+
         # Set up readline
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
+        readline.set_completer_delims(' \t\n')  # Better delimiters
 
     def list_executables(self):
         binaries = []
         for path in self.paths:
-            for root, _, files in os.walk(path):
-                for filename in files:
-                    filepath = os.path.join(root, filename)
-                    # print(filename,filepath)
-
-                    if os.access(filepath, os.X_OK) and not os.path.isdir(filepath) and filename not in self.paths:
-                        binaries.append(filename)
+            if not os.path.isdir(path):
+                continue
+            files = os.listdir(path)
+            for filename in files:
+                filepath = os.path.join(path, filename)
+                if os.path.isfile(filepath) and os.access(filepath, os.X_OK):
+                    binaries.append(filename)
         return binaries
 
     def completer(self, text, state):
@@ -68,11 +50,15 @@ class Shell():
         - state: iteration number (0, 1, 2... until we return None)
         """
         # Get matches for the current text
-        matches = [cmd + ' ' for cmd in self.autocomplete_commands if cmd.startswith(text)]
+        matches = [cmd for cmd in self.autocomplete_commands if cmd.startswith(text)]
         
         # Return the match for this state, or None if no more matches
         try:
-            return matches[state]
+            completion = matches[state]
+            if len(matches) == 1:
+                completion += " "
+            # print(f"[DEBUG] completing : '{completion}'")
+            return completion
         except IndexError:
             return None
 
@@ -135,8 +121,7 @@ class Shell():
                 if command.get("redirect") == 3:
                     redirect_output = stdout + stderr
                     stdout, stderr = None, None
-                # stdout_stderr = stdout | stderr
-                fp.write(redirect_output) # writes empty stdout to file
+                fp.write(redirect_output)
 
         # heres the error, im assuming that streams are exclusive
         # but "cat a.txt b.txt 2> c.txt" when a exists and b not, should print stdout and redirect stderr
@@ -147,7 +132,6 @@ class Shell():
             message += stderr
 
         if message:
-            # sys.stdout.write(message + ( "\n" if not message.endswith("\n") else ""))
             sys.stdout.write(message)
         
         # general return for no input
@@ -173,6 +157,7 @@ class Shell():
     
     def execute_program(self, *args, **kwargs):
         for path in self.paths:
+            # print(path)
             file_path = os.path.join(path,kwargs.get("command"))
             if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
                 result = subprocess.run([kwargs.get("command")] + kwargs.get("args"), capture_output=True, text=True)
@@ -205,9 +190,7 @@ class Shell():
 
     def repl(self, *args, **kwargs):
         while True:
-            sys.stdout.write("$ ")
-            status_code, stdout, stderr = self.execute_command(input())
-            
+            status_code, stdout, stderr = self.execute_command(input("$ "))
             if status_code < 0:
                 break
 
