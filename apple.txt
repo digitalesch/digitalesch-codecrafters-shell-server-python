@@ -1,2 +1,4 @@
 echo apple banana orange
 echo pear blueberry orange
+echo 1234
+exit

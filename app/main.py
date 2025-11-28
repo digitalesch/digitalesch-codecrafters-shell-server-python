@@ -341,7 +341,14 @@ class Shell:
 
                 # If the exit command was issued, break
                 if isinstance(result, PipelineExecution) and result.status_code < 0:
-                    break
+                    # Save history to file before exiting (if HISTFILE is set)
+                    if self.histfile_var:
+                        try:
+                            with open(self.histfile_var, 'w') as fp:
+                                fp.write('\n'.join([cmd[1] for cmd in self.history]) + '\n')
+                        except Exception as e:
+                            print(f"Warning: Could not save history: {e}", file=sys.stderr)
+                    break  # ✅ CRITICAL: Add this break statement!
 
             except EOFError:
                 # Ctrl+D pressed
