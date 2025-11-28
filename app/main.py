@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import readline
 import os
 import sys
+import io
+
 
 @dataclass
 class PipelineExecution:
@@ -141,26 +143,28 @@ class Shell:
         return head
 
 
-    def run_pipeline_real_pipes(self, pipeline_dict) -> PipelineExecution:
+    def run_pipelins(self, pipeline_dict) -> PipelineExecution:
+        # Flatten pipeline into list
         pipeline_list = []
         pd = pipeline_dict
         while pd:
             pipeline_list.insert(0, pd)
             pd = pd.get("input")
 
+        last_result = PipelineExecution()
         prev_proc = None
-        procs = []
-        last_result = PipelineExecution()  # <- initialize safely
 
-        for pipe_cmd in pipeline_list:
-            stdin = prev_proc.stdout if prev_proc else None
-
+        for idx, pipe_cmd in enumerate(pipeline_list):
             file = pipe_cmd.get("file")
             fd = pipe_cmd.get("file_descriptor", 0)
             stdout_target = None
             stderr_target = None
             f = None
 
+            # Determine if this is the last command
+            is_last = (idx == len(pipeline_list) - 1)
+
+            # Redirection
             if file:
                 mode = "a" if fd in [4, 5, 6] else "w"
                 f = open(file, mode)
@@ -171,39 +175,63 @@ class Shell:
 
             # Built-in
             if pipe_cmd["command"] in self.available_commands:
+                # If there's a previous process, we need to consume its output first
+                if prev_proc:
+                    prev_proc.wait()
+                    if prev_proc.stdout:
+                        prev_proc.stdout.close()
+                
                 last_result = self.available_commands[pipe_cmd["command"]](
                     args=pipe_cmd.get("args", []),
-                    file_descriptor=fd,
-                    file=file
+                    file=file,
+                    file_descriptor=fd
                 )
-                if stdout_target:
-                    stdout_target.write(last_result.stdout)
-                    stdout_target.flush()
-                else:
-                    sys.stdout.write(last_result.stdout)
-                    sys.stdout.flush()
 
-                if stderr_target:
-                    stderr_target.write(last_result.stderr)
-                    stderr_target.flush()
+                # If piped, use subprocess.PIPE
+                if not is_last:
+                    prev_proc = subprocess.Popen(
+                        ["cat"],
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    prev_proc.stdin.write(last_result.stdout)
+                    prev_proc.stdin.close()
                 else:
-                    sys.stderr.write(last_result.stderr)
-                    sys.stderr.flush()
+                    # Last command: output to terminal/file
+                    if stdout_target:
+                        stdout_target.write(last_result.stdout)
+                        stdout_target.flush()
+                    else:
+                        sys.stdout.write(last_result.stdout)
+                        sys.stdout.flush()
+
+                    if stderr_target:
+                        stderr_target.write(last_result.stderr)
+                        stderr_target.flush()
+                    else:
+                        sys.stderr.write(last_result.stderr)
+                        sys.stderr.flush()
 
                 if f:
                     f.close()
-                prev_proc = None
                 continue
 
             # External command
             try:
+                # Determine stdout for this process
+                if is_last:
+                    proc_stdout = stdout_target if stdout_target else None
+                else:
+                    proc_stdout = subprocess.PIPE
+
                 proc = subprocess.Popen(
                     [pipe_cmd["command"]] + pipe_cmd.get("args", []),
-                    stdin=stdin,
-                    stdout=stdout_target or subprocess.PIPE,
+                    stdin=prev_proc.stdout if prev_proc else None,
+                    stdout=proc_stdout,
                     stderr=stderr_target or subprocess.PIPE,
-                    text=True,
-                    bufsize=1
+                    text=True
                 )
             except FileNotFoundError:
                 msg = f"{pipe_cmd['command']}: command not found\n"
@@ -214,43 +242,45 @@ class Shell:
                 else:
                     sys.stderr.write(msg)
                     sys.stderr.flush()
+                if f:
+                    f.close()
                 prev_proc = None
                 continue
 
+            # Close the previous process's stdout so it gets SIGPIPE when appropriate
             if prev_proc:
                 prev_proc.stdout.close()
-            procs.append(proc)
+
             prev_proc = proc
 
-        # Stream last process output if not redirected
-        if procs:
-            final_proc = procs[-1]
-
-            if final_proc.stdout and stdout_target is None:
-                for line in iter(final_proc.stdout.readline, ''):
-                    sys.stdout.write(line)
+        # Wait for the last process and handle its output
+        if prev_proc:
+            try:
+                stdout_data, stderr_data = prev_proc.communicate()
+                
+                # Output to terminal if not redirected
+                if stdout_data and not stdout_target:
+                    sys.stdout.write(stdout_data)
                     sys.stdout.flush()
-
-            if final_proc.stderr and stderr_target is None:
-                for line in iter(final_proc.stderr.readline, ''):
-                    sys.stderr.write(line)
+                if stderr_data and not stderr_target:
+                    sys.stderr.write(stderr_data)
                     sys.stderr.flush()
+                    
+                last_result.status_code = prev_proc.returncode
+            except Exception as e:
+                last_result.status_code = 1
+                sys.stderr.write(f"Error: {e}\n")
 
-            for p in procs:
-                p.wait()
-
-            if f:
-                f.close()
+        if f:
+            f.close()
 
         return last_result
-
-
 
     # Execute commands entry
     def execute_commands(self, command: str):
         pipeline_components = [shlex.split(cmd) for cmd in command.split("|")]
         pipeline = self.build_pipeline(pipeline_components)
-        return self.run_pipeline_real_pipes(pipeline)
+        return self.run_pipelins(pipeline)
 
     def repl(self):
         while True:
