@@ -38,13 +38,25 @@ class Shell:
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
         readline.set_completer_delims(' \t\n')
+        readline.set_history_length(1000)
 
     # Builtin implementations
     def history(self, **kwargs):
         entries = len(self.history)
         if kwargs.get("args"):
             # print(f"Using {kwargs.get("args")}")
-            entries = int(kwargs.get("args")[0])
+            try:
+                entries = int(kwargs.get("args")[0])
+            except:
+                with open(kwargs.get("args")[1],"r") as fp:
+                    # print(fp.readlines())
+                    lines = [(index+entries + 1,line.strip()) for index, line in enumerate(fp)]
+                    # print(lines)
+                    self.history += lines
+                    entries = len(self.history)
+                    for cmd in lines:
+                        readline.add_history(cmd[1])
+                return PipelineExecution(status_code=0)
 
         history_display = [f'    {index}  {cmd}' for index, cmd in self.history[-entries:]]
         return PipelineExecution(status_code=0, stdout='\n'.join(history_display)+'\n')
