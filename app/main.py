@@ -34,6 +34,7 @@ class Shell:
         self.autocomplete_commands = builtin_cmds + external_cmds
         self.autocomplete_commands.sort()
         self.history = []
+        self.entries = 0
 
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
@@ -42,28 +43,40 @@ class Shell:
 
     # Builtin implementations
     def history(self, **kwargs):
-        entries = len(self.history)
+        # self.entries = len(self.history)
         if kwargs.get("args"):
             # print(f"Using {kwargs.get("args")}")
             try:
-                entries = int(kwargs.get("args")[0])
+                self.entries = int(kwargs.get("args")[0])
             except:
+                # print(self.entries)
                 if kwargs.get("args")[0] == "-r":
                     with open(kwargs.get("args")[1],"r") as fp:
                         # print(fp.readlines())
-                        lines = [(index+entries + 1,line.strip()) for index, line in enumerate(fp)]
+                        # print(self.history)
+                        lines = [(index+self.entries + 2,line.strip()) for index, line in enumerate(fp)]
                         # print(lines)
                         self.history += lines
-                        entries = len(self.history)
                         for cmd in lines:
                             readline.add_history(cmd[1])
                 if kwargs.get("args")[0] == "-w":
                     with open(kwargs.get("args")[1],"w") as fp:
                         fp.write('\n'.join([cmd[1] for cmd in self.history])+'\n')
+                
+                if kwargs.get("args")[0] == "-a":
+                    # print([cmd[1] for cmd in self.history[-self.entries:]])
+                    # print(len(self.history)-self.entries)
+                    with open(kwargs.get("args")[1],"a") as fp:
+                        fp.write('\n'.join([cmd[1] for cmd in self.history[(self.entries-len(self.history)):]])+'\n')
 
+                self.entries = len(self.history)
+                
                 return PipelineExecution(status_code=0)
-
-        history_display = [f'    {index}  {cmd}' for index, cmd in self.history[-entries:]]
+        
+        # print(self.history)
+        if len(kwargs.get("args")) == 0:
+            self.entries = 0
+        history_display = [f'    {index}  {cmd}' for index, cmd in self.history[-self.entries:]]
         return PipelineExecution(status_code=0, stdout='\n'.join(history_display)+'\n')
 
     def exit(self, **kwargs):
