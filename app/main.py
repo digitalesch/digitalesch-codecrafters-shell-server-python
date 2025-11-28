@@ -43,9 +43,12 @@ class Shell:
 
     # Builtin implementations
     def history(self, **kwargs):
-        # print([f'   {index + 1}  {cmd}' for index, cmd in enumerate(self.history)])
+        entries = len(self.history)
+        if kwargs.get("args"):
+            # print(f"Using {kwargs.get("args")}")
+            entries = int(kwargs.get("args")[0])
 
-        history_display = [f'    {index + 1}  {cmd}' for index, cmd in enumerate(self.history)]
+        history_display = [f'    {index}  {cmd}' for index, cmd in self.history[-entries:]]
         return PipelineExecution(status_code=0, stdout='\n'.join(history_display)+'\n')
 
     def exit(self, **kwargs):
@@ -298,7 +301,7 @@ class Shell:
                     continue
 
                 # add command to history
-                self.history.append(command)
+                self.history.append((len(self.history)+1,command))
 
                 # Execute the command
                 result = self.execute_commands(command)
