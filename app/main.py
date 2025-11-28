@@ -26,6 +26,8 @@ class Shell:
         }
         self.current_dir = os.getcwd()
         self.path_var = os.environ.get("PATH", "")
+        self.histfile_var = os.environ.get("HISTFILE", "")
+        # self.histfile_var = "apple.txt"    
         self.paths = self.path_var.split(os.pathsep)
         # self.paths = "bin/bar"
         self.executable_commands = self.list_executables()
@@ -33,8 +35,8 @@ class Shell:
         external_cmds = [cmd for cmd in self.executable_commands if cmd not in builtin_cmds]
         self.autocomplete_commands = builtin_cmds + external_cmds
         self.autocomplete_commands.sort()
-        self.history = []
         self.entries = 0
+        self.history = self.load_history(self.histfile_var)
 
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
@@ -42,20 +44,26 @@ class Shell:
         readline.set_history_length(1000)
 
     # Builtin implementations
+    def load_history(self, histfile_var):
+        if len(histfile_var) > 0:
+            try:
+                with open(self.histfile_var, "r") as fp:
+                    entries = [(index+self.entries + 1,line.strip()) for index, line in enumerate(fp)]
+                    for cmd in entries:
+                        readline.add_history(cmd[1])
+                    return entries
+            except Exception as e:
+                return []
+        return []
+
     def history(self, **kwargs):
-        # self.entries = len(self.history)
         if kwargs.get("args"):
-            # print(f"Using {kwargs.get("args")}")
             try:
                 self.entries = int(kwargs.get("args")[0])
             except:
-                # print(self.entries)
                 if kwargs.get("args")[0] == "-r":
                     with open(kwargs.get("args")[1],"r") as fp:
-                        # print(fp.readlines())
-                        # print(self.history)
                         lines = [(index+self.entries + 2,line.strip()) for index, line in enumerate(fp)]
-                        # print(lines)
                         self.history += lines
                         for cmd in lines:
                             readline.add_history(cmd[1])
@@ -64,8 +72,6 @@ class Shell:
                         fp.write('\n'.join([cmd[1] for cmd in self.history])+'\n')
                 
                 if kwargs.get("args")[0] == "-a":
-                    # print([cmd[1] for cmd in self.history[-self.entries:]])
-                    # print(len(self.history)-self.entries)
                     with open(kwargs.get("args")[1],"a") as fp:
                         fp.write('\n'.join([cmd[1] for cmd in self.history[(self.entries-len(self.history)):]])+'\n')
 
@@ -73,7 +79,6 @@ class Shell:
                 
                 return PipelineExecution(status_code=0)
         
-        # print(self.history)
         if len(kwargs.get("args")) == 0:
             self.entries = 0
         history_display = [f'    {index}  {cmd}' for index, cmd in self.history[-self.entries:]]

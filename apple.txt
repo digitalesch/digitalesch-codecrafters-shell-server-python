@@ -1,3 +1,2 @@
-echo pear strawberry grape
-echo pear blueberry
-echo apple orange blueberry
+echo apple banana orange
+echo pear blueberry orange
