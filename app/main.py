@@ -349,7 +349,7 @@ class Shell:
                                 # Only write commands added in this session
                                 new_commands = self.history[self.initial_history_length:]
                                 # Exclude the 'exit' command itself
-                                commands_to_write = [cmd[1] for cmd in new_commands if cmd[1] != 'exit']
+                                commands_to_write = [cmd[1] for cmd in new_commands]
                                 if commands_to_write:
                                     fp.write('\n'.join(commands_to_write) + '\n')
                         except Exception as e:
