@@ -35,6 +35,7 @@ class Shell:
         external_cmds = [cmd for cmd in self.executable_commands if cmd not in builtin_cmds]
         self.autocomplete_commands = builtin_cmds + external_cmds
         self.autocomplete_commands.sort()
+        self.history = []
 
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
@@ -42,7 +43,10 @@ class Shell:
 
     # Builtin implementations
     def history(self, **kwargs):
-        pass
+        # print([f'   {index + 1}  {cmd}' for index, cmd in enumerate(self.history)])
+
+        history_display = [f'    {index + 1}  {cmd}' for index, cmd in enumerate(self.history)]
+        return PipelineExecution(status_code=0, stdout='\n'.join(history_display)+'\n')
 
     def exit(self, **kwargs):
         return PipelineExecution(status_code=-1)
@@ -292,6 +296,9 @@ class Shell:
                 command = input("$ ")
                 if not command.strip():
                     continue
+
+                # add command to history
+                self.history.append(command)
 
                 # Execute the command
                 result = self.execute_commands(command)
