@@ -4,8 +4,6 @@ from dataclasses import dataclass
 import readline
 import os
 import sys
-import io
-
 
 @dataclass
 class PipelineExecution:
