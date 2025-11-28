@@ -23,12 +23,13 @@ class Shell:
             "echo": self.echo,
             "pwd": self.pwd,
             "cd": self.cd,
-            "type": self.type
+            "type": self.type,
+            "history": self.history
         }
         self.current_dir = os.getcwd()
         self.path_var = os.environ.get("PATH", "")
         self.paths = self.path_var.split(os.pathsep)
-        # self.paths = "bin/bar"
+        self.paths = "bin/bar"
         self.executable_commands = self.list_executables()
         builtin_cmds = list(self.available_commands.keys())
         external_cmds = [cmd for cmd in self.executable_commands if cmd not in builtin_cmds]
@@ -40,6 +41,9 @@ class Shell:
         readline.set_completer_delims(' \t\n')
 
     # Builtin implementations
+    def history(self, **kwargs):
+        pass
+    
     def exit(self, **kwargs):
         return PipelineExecution(status_code=-1)
 
