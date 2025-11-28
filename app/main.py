@@ -37,6 +37,7 @@ class Shell:
         self.autocomplete_commands.sort()
         self.entries = 0
         self.history = self.load_history(self.histfile_var)
+        self.initial_history_length = len(self.history)
 
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
@@ -341,14 +342,19 @@ class Shell:
 
                 # If the exit command was issued, break
                 if isinstance(result, PipelineExecution) and result.status_code < 0:
-                    # Save history to file before exiting (if HISTFILE is set)
+                    # Save only NEW commands to file (append mode)
                     if self.histfile_var:
                         try:
                             with open(self.histfile_var, 'a') as fp:
-                                fp.write('\n'.join([cmd[1] for cmd in self.history]) + '\n')
+                                # Only write commands added in this session
+                                new_commands = self.history[self.initial_history_length:]
+                                # Exclude the 'exit' command itself
+                                commands_to_write = [cmd[1] for cmd in new_commands if cmd[1] != 'exit']
+                                if commands_to_write:
+                                    fp.write('\n'.join(commands_to_write) + '\n')
                         except Exception as e:
                             print(f"Warning: Could not save history: {e}", file=sys.stderr)
-                    break  # ✅ CRITICAL: Add this break statement!
+                    break
 
             except EOFError:
                 # Ctrl+D pressed
