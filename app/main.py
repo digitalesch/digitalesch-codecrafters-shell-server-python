@@ -48,14 +48,19 @@ class Shell:
             try:
                 entries = int(kwargs.get("args")[0])
             except:
-                with open(kwargs.get("args")[1],"r") as fp:
-                    # print(fp.readlines())
-                    lines = [(index+entries + 1,line.strip()) for index, line in enumerate(fp)]
-                    # print(lines)
-                    self.history += lines
-                    entries = len(self.history)
-                    for cmd in lines:
-                        readline.add_history(cmd[1])
+                if kwargs.get("args")[0] == "-r":
+                    with open(kwargs.get("args")[1],"r") as fp:
+                        # print(fp.readlines())
+                        lines = [(index+entries + 1,line.strip()) for index, line in enumerate(fp)]
+                        # print(lines)
+                        self.history += lines
+                        entries = len(self.history)
+                        for cmd in lines:
+                            readline.add_history(cmd[1])
+                if kwargs.get("args")[0] == "-w":
+                    with open(kwargs.get("args")[1],"w") as fp:
+                        fp.write('\n'.join([cmd[1] for cmd in self.history])+'\n')
+
                 return PipelineExecution(status_code=0)
 
         history_display = [f'    {index}  {cmd}' for index, cmd in self.history[-entries:]]
