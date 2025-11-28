@@ -1,198 +1,279 @@
-import sys
-import os
 import subprocess
 import shlex
+from dataclasses import dataclass
 import readline
+import os
+import sys
 
-class Shell():
+@dataclass
+class PipelineExecution:
+    status_code: int = 0
+    stdin: str = ""
+    stdout: str = ""
+    stderr: str = ""
+    file_descriptor: int = None
+    file: str = None
+
+class Shell:
     def __init__(self):
         self.available_commands = {
-            'exit': self.exit,
-            'echo': self.echo,
-            'type': self.type,
-            "pwd":  self.pwd,
-            "cd":   self.cd
+            "exit": self.exit,
+            "echo": self.echo,
+            "pwd": self.pwd,
+            "cd": self.cd,
+            "type": self.type
         }
         self.current_dir = os.getcwd()
         self.path_var = os.environ.get("PATH", "")
-        # self.path_var = "bin/bar:bin/foo:bin/qux"
         self.paths = self.path_var.split(os.pathsep)
-
+        # self.paths = "bin/bar"
         self.executable_commands = self.list_executables()
-
-        # FIXED: Deduplicate and prioritize builtins
         builtin_cmds = list(self.available_commands.keys())
         external_cmds = [cmd for cmd in self.executable_commands if cmd not in builtin_cmds]
         self.autocomplete_commands = builtin_cmds + external_cmds
-        self.autocomplete_commands.sort()  # Optional: consistent order
+        self.autocomplete_commands.sort()
 
-        # Set up readline
         readline.set_completer(self.completer)
         readline.parse_and_bind("tab: complete")
-        readline.set_completer_delims(' \t\n')  # Better delimiters
+        readline.set_completer_delims(' \t\n')
+
+    # Builtin implementations
+    def exit(self, **kwargs):
+        return PipelineExecution(status_code=-1)
+
+    def echo(self, **kwargs):
+        output = ' '.join(kwargs.get("args", [])) + "\n"
+        return PipelineExecution(
+            status_code=0,
+            stdout=output,
+            stderr="",
+            file_descriptor=kwargs.get("file_descriptor"),
+            file=kwargs.get("file")
+        )
+
+    def pwd(self, **kwargs):
+        return PipelineExecution(
+            status_code=0,
+            stdout=f"{self.current_dir}\n",
+            stderr="",
+            file_descriptor=kwargs.get("file_descriptor"),
+            file=kwargs.get("file")
+        )
+
+    def cd(self, **kwargs):
+        path = kwargs.get("args", [None])[0]
+        if path is None:
+            return PipelineExecution(status_code=1, stderr="cd: missing argument\n")
+        if path == "~":
+            self.current_dir = os.getenv("HOME")
+        else:
+            joined_path = path if os.path.isabs(path) else os.path.join(self.current_dir, path)
+            if os.path.exists(joined_path):
+                self.current_dir = os.path.normpath(joined_path)
+            else:
+                return PipelineExecution(status_code=1, stderr=f"cd: {joined_path}: No such file or directory\n")
+        return PipelineExecution(status_code=0)
+
+    def type(self, **kwargs):
+        cmd = kwargs.get("args", [None])[0]
+        if cmd in self.available_commands:
+            return PipelineExecution(status_code=0, stdout=f"{cmd} is a shell builtin\n")
+        for path in self.paths:
+            exe = os.path.join(path, cmd)
+            if os.path.isfile(exe) and os.access(exe, os.X_OK):
+                return PipelineExecution(status_code=0, stdout=f"{cmd} is {exe}\n")
+        return PipelineExecution(status_code=1, stderr=f"{cmd}: not found\n")
 
     def list_executables(self):
         binaries = []
         for path in self.paths:
             if not os.path.isdir(path):
                 continue
-            files = os.listdir(path)
-            for filename in files:
-                filepath = os.path.join(path, filename)
-                if os.path.isfile(filepath) and os.access(filepath, os.X_OK):
-                    binaries.append(filename)
+            for f in os.listdir(path):
+                fp = os.path.join(path, f)
+                if os.path.isfile(fp) and os.access(fp, os.X_OK):
+                    binaries.append(f)
         return binaries
 
     def completer(self, text, state):
-        """
-        Completion function called by readline.
-        - text: the text to complete
-        - state: iteration number (0, 1, 2... until we return None)
-        """
-        # Get matches for the current text
         matches = [cmd for cmd in self.autocomplete_commands if cmd.startswith(text)]
-        
-        # Return the match for this state, or None if no more matches
         try:
             completion = matches[state]
             if len(matches) == 1:
                 completion += " "
-            # print(f"[DEBUG] completing : '{completion}'")
             return completion
         except IndexError:
             return None
 
-    def parse_commands(self, input: str, **kwargs):
-        parts = shlex.split(input)
-
-        file_redirect = None
-        redirect = 0
-        func_args = parts[1:]
-        mode = 0
-
-        if len(parts) > 0:
-            command = parts[0]
-            if any(['>' in parts,'1>' in parts,'>>' in parts,'1>>' in parts]):
-                redirect = 1
-            if any(['2>' in parts,'2>>' in parts]):
-                redirect = 2
-            if '2>&1' in parts:
-                redirect = 3
-            if any(['>>' in parts,'1>>' in parts, '2>>' in parts]):
-                mode = 1
-            if redirect > 0:
-                file_redirect = parts[-1]
-                func_args = parts[1:-2]
-        else:
-            command = None
-            func_args = []
-
-        return {
-            "original": parts,
-            "command": command,
-            "args": func_args,
-            "redirect": redirect,
-            "file": file_redirect,
-            "mode": mode
+    # Redirection mapping
+    def return_file_descriptor(self, tokens):
+        redirect_map = {
+            '>': 1,
+            '1>': 1,
+            '2>': 2,
+            '2>&1': 3,
+            '>>': 4,
+            '2>>': 5,
+            "1>>": 6
         }
+        for i, t in enumerate(tokens):
+            if t in redirect_map and i + 1 < len(tokens):
+                return tokens[i+1], redirect_map[t], i
+        return None, 0, -1
 
-    def execute_command(self, args: str):
-        command = self.parse_commands(args)
-        status_code, stdout, stderr = 0, "", ""
-        if command.get("command"):
+    # Build pipeline dict
+    def build_pipeline(self, commands):
+        head = None
+        for cmd in commands:
+            file, fd, idx = self.return_file_descriptor(cmd)
+            if file:
+                execute = cmd[:idx]  # remove redirection token + target
+            else:
+                execute = cmd
+            head = {
+                "original": cmd,
+                "command": execute[0],
+                "args": execute[1:],  # only real arguments
+                "file": file,
+                "file_descriptor": fd,
+                "input": head
+            }
+        return head
+
+
+    def run_pipeline_real_pipes(self, pipeline_dict) -> PipelineExecution:
+        pipeline_list = []
+        pd = pipeline_dict
+        while pd:
+            pipeline_list.insert(0, pd)
+            pd = pd.get("input")
+
+        prev_proc = None
+        procs = []
+        last_result = PipelineExecution()  # <- initialize safely
+
+        for pipe_cmd in pipeline_list:
+            stdin = prev_proc.stdout if prev_proc else None
+
+            file = pipe_cmd.get("file")
+            fd = pipe_cmd.get("file_descriptor", 0)
+            stdout_target = None
+            stderr_target = None
+            f = None
+
+            if file:
+                mode = "a" if fd in [4, 5, 6] else "w"
+                f = open(file, mode)
+                if fd in [1, 3, 4, 6]:
+                    stdout_target = f
+                if fd in [2, 3, 5]:
+                    stderr_target = f
+
+            # Built-in
+            if pipe_cmd["command"] in self.available_commands:
+                last_result = self.available_commands[pipe_cmd["command"]](
+                    args=pipe_cmd.get("args", []),
+                    file_descriptor=fd,
+                    file=file
+                )
+                if stdout_target:
+                    stdout_target.write(last_result.stdout)
+                    stdout_target.flush()
+                else:
+                    sys.stdout.write(last_result.stdout)
+                    sys.stdout.flush()
+
+                if stderr_target:
+                    stderr_target.write(last_result.stderr)
+                    stderr_target.flush()
+                else:
+                    sys.stderr.write(last_result.stderr)
+                    sys.stderr.flush()
+
+                if f:
+                    f.close()
+                prev_proc = None
+                continue
+
+            # External command
             try:
-                status_code, stdout, stderr = self.available_commands[command.get("command")](**command)
-            except Exception as e:
-                # print(e)
-                status_code, stdout, stderr = self.execute_program(**command)
-                if status_code < 0:
-                    status_code, stdout, stderr = 1, "", f"{command.get("command")}: command not found\n"
-        
-        
-        # print(stderr, stdout, len(stderr), len(stdout))
-        if command.get("redirect") > 0:
-            with open(command.get("file"),"w" if command.get("mode")==0 else "a") as fp:
-                if command.get("redirect") == 1:
-                    redirect_output = stdout if stdout else ""
-                    stdout = None
-                if command.get("redirect") == 2:
-                    redirect_output = stderr if stderr else ""
-                    stderr = None
-                if command.get("redirect") == 3:
-                    redirect_output = stdout + stderr
-                    stdout, stderr = None, None
-                fp.write(redirect_output)
+                proc = subprocess.Popen(
+                    [pipe_cmd["command"]] + pipe_cmd.get("args", []),
+                    stdin=stdin,
+                    stdout=stdout_target or subprocess.PIPE,
+                    stderr=stderr_target or subprocess.PIPE,
+                    text=True,
+                    bufsize=1
+                )
+            except FileNotFoundError:
+                msg = f"{pipe_cmd['command']}: command not found\n"
+                last_result = PipelineExecution(status_code=127, stderr=msg)
+                if stderr_target:
+                    stderr_target.write(msg)
+                    stderr_target.flush()
+                else:
+                    sys.stderr.write(msg)
+                    sys.stderr.flush()
+                prev_proc = None
+                continue
 
-        # heres the error, im assuming that streams are exclusive
-        # but "cat a.txt b.txt 2> c.txt" when a exists and b not, should print stdout and redirect stderr
-        message = ""
-        if stdout:
-            message += stdout
-        if stderr:
-            message += stderr
+            if prev_proc:
+                prev_proc.stdout.close()
+            procs.append(proc)
+            prev_proc = proc
 
-        if message:
-            sys.stdout.write(message)
-        
-        # general return for no input
-        return (status_code,stdout if stdout else "", stderr if stderr else "")
+        # Stream last process output if not redirected
+        if procs:
+            final_proc = procs[-1]
 
-    def exit(self, *args, **kwargs):
-        return (-1, "", "")
+            if final_proc.stdout and stdout_target is None:
+                for line in iter(final_proc.stdout.readline, ''):
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
 
-    def echo(self, *args, **kwargs):
-        return (0,' '.join(kwargs.get("args")) + "\n", "")
+            if final_proc.stderr and stderr_target is None:
+                for line in iter(final_proc.stderr.readline, ''):
+                    sys.stderr.write(line)
+                    sys.stderr.flush()
 
-    def type(self, *args, **kwargs):
-        command_args = kwargs.get("args")[0]
-        if command_args in self.available_commands:
-            return (0, f"{command_args} is a shell builtin\n", "")
-        else:
-            for path in self.paths:
-                file_path = os.path.join(path,command_args)
-                if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
-                    return (0, f"{command_args} is {file_path}\n", "")
+            for p in procs:
+                p.wait()
 
-            return (1, "", f"{command_args}: not found\n")
-    
-    def execute_program(self, *args, **kwargs):
-        for path in self.paths:
-            # print(path)
-            file_path = os.path.join(path,kwargs.get("command"))
-            if os.path.isfile(file_path) and os.access(file_path, os.X_OK):
-                result = subprocess.run([kwargs.get("command")] + kwargs.get("args"), capture_output=True, text=True)
-                # print(result)
-                return (result.returncode, result.stdout, result.stderr)
-        return (-1, "", "")
-    
-    def pwd(self, *args, **kwargs):
-        return (0, f"{self.current_dir}\n", "")
-    
-    def cd(self, *args, **kwargs):
-        # gets path from kwargs args
-        path = kwargs.get("args")[0]
-        if path == "~":
-            self.current_dir = os.getenv("HOME")
-            return (0, "", "")
-        if os.path.isabs(path):
-            if os.path.exists(path):
-                self.current_dir = path
-            else:
-                return (1, "", f"cd: {path}: No such file or directory\n")
-        else:
-            joined_path = os.path.normpath(os.path.join(self.current_dir, path))
-            if os.path.exists(joined_path):
-                self.current_dir = joined_path
-            else:
-                return (1, "", f"cd: {joined_path}: No such file or directory\n")
-        
-        return (0, "", "")
+            if f:
+                f.close()
 
-    def repl(self, *args, **kwargs):
+        return last_result
+
+
+
+    # Execute commands entry
+    def execute_commands(self, command: str):
+        pipeline_components = [shlex.split(cmd) for cmd in command.split("|")]
+        pipeline = self.build_pipeline(pipeline_components)
+        return self.run_pipeline_real_pipes(pipeline)
+
+    def repl(self):
         while True:
-            status_code, stdout, stderr = self.execute_command(input("$ "))
-            if status_code < 0:
+            try:
+                command = input("$ ")
+                if not command.strip():
+                    continue
+
+                # Execute the command
+                result = self.execute_commands(command)
+
+                # If the exit command was issued, break
+                if isinstance(result, PipelineExecution) and result.status_code < 0:
+                    break
+
+            except EOFError:
+                # Ctrl+D pressed
+                print()  # move to a new line
                 break
+            except KeyboardInterrupt:
+                # Ctrl+C pressed, just print a new prompt
+                break
+
 
 def main():
     shell = Shell()
